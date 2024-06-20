@@ -662,7 +662,6 @@ where
         let aws_external_id_prefix = self.connection_context().aws_external_id_prefix.clone();
         let aws_connection_role_arn = self.connection_context().aws_connection_role_arn.clone();
         let persist_pubsub_url = self.persist_pubsub_url.clone();
-        let txn_wal_tables = self.txn_wal_tables;
         let secrets_args = self.secrets_args.to_flags();
         let service = self
             .orchestrator
@@ -685,7 +684,6 @@ where
                             format!("--opentelemetry-resource=cluster_id={}", cluster_id),
                             format!("--opentelemetry-resource=replica_id={}", replica_id),
                             format!("--persist-pubsub-url={}", persist_pubsub_url),
-                            format!("--persist-txn-tables={}", txn_wal_tables),
                             format!("--environment-id={}", environment_id),
                         ];
                         if let Some(aws_external_id_prefix) = &aws_external_id_prefix {

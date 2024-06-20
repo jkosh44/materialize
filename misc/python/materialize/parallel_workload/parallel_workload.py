@@ -237,10 +237,6 @@ def run(
         threads.append(thread)
     elif scenario == Scenario.ToggleTxnWal:
 
-        def toggle_txn_wal(params: dict[str, str]) -> dict[str, str]:
-            params["persist_txn_tables"] = random.choice(["off", "eager", "lazy"])
-            return params
-
         worker_rng = random.Random(rng.randrange(SEED_RANGE))
         assert composition, "ToggleTxnWal scenario only works in mzcompose"
         worker = Worker(
@@ -250,7 +246,6 @@ def run(
                     worker_rng,
                     composition,
                     sanity_restart,
-                    toggle_txn_wal,
                 )
             ],
             [1],
