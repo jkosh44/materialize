@@ -13,6 +13,7 @@ use mz_sql_parser::ast::IntervalValue;
 
 use crate::plan::PlanError;
 
+/// TODO(jkosh44)
 pub fn plan_interval(iv: &IntervalValue) -> Result<Interval, PlanError> {
     let leading_precision = parser_datetimefield_to_adt(iv.precision_high);
     let mut i = strconv::parse_interval_w_disambiguator(
@@ -31,6 +32,13 @@ pub fn plan_interval(iv: &IntervalValue) -> Result<Interval, PlanError> {
         RoundBehavior::Nearest,
     )?;
     Ok(i)
+}
+
+/// TODO(jkosh44)
+pub fn unplan_interval(i: &Interval) -> IntervalValue {
+    let mut iv = IntervalValue::default();
+    iv.value = i.to_string();
+    iv
 }
 
 fn parser_datetimefield_to_adt(

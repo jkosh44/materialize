@@ -20,9 +20,9 @@ use mz_ore::collections::CollectionExt;
 use mz_repr::{Datum, GlobalId, RelationDesc, Row, ScalarType};
 use mz_sql_parser::ast::display::AstDisplay;
 use mz_sql_parser::ast::{
-    CreateSourceSubsource, ObjectType, ReferencedSubsources, ShowCreateConnectionStatement,
-    ShowCreateMaterializedViewStatement, ShowObjectType, SystemObjectType, UnresolvedItemName,
-    WithOptionValue,
+    CreateSourceSubsource, ObjectType, ReferencedSubsources, ShowCreateClusterStatement,
+    ShowCreateConnectionStatement, ShowCreateMaterializedViewStatement, ShowObjectType,
+    SystemObjectType, UnresolvedItemName, WithOptionValue,
 };
 use query::QueryContext;
 
@@ -39,6 +39,7 @@ use crate::names::{
 };
 use crate::parse;
 use crate::plan::scope::Scope;
+use crate::plan::statement::ddl::unplan_create_cluster;
 use crate::plan::statement::{dml, StatementContext, StatementDesc};
 use crate::plan::{
     query, transform_ast, HirRelationExpr, Params, Plan, PlanError, ShowColumnsPlan, ShowCreatePlan,
@@ -190,6 +191,34 @@ pub fn plan_show_create_index(
 pub fn describe_show_create_connection(
     _: &StatementContext,
     _: ShowCreateConnectionStatement<Aug>,
+) -> Result<StatementDesc, PlanError> {
+    Ok(StatementDesc::new(Some(
+        RelationDesc::empty()
+            .with_column("name", ScalarType::String.nullable(false))
+            .with_column("create_sql", ScalarType::String.nullable(false)),
+    )))
+}
+
+pub fn plan_show_create_cluster(
+    scx: &StatementContext,
+    ShowCreateClusterStatement { cluster_name }: ShowCreateClusterStatement<Aug>,
+) -> Result<ShowCreatePlan, PlanError> {
+    // TODO(jkosh44) Don't forget to add docs.
+    let cluster = scx.get_cluster(&cluster_name.id);
+    let name = cluster.name().to_string();
+    let plan = cluster.unsequence();
+    let stmt = unplan_create_cluster(plan);
+    let create_sql = stmt.to_ast_string_stable();
+    // TODO(jkosh44) id is obviously wrong. We should switch to ObjectId.
+    Ok(ShowCreatePlan {
+        id: GlobalId::System(1),
+        row: Row::pack_slice(&[Datum::String(&name), Datum::String(&create_sql)]),
+    })
+}
+
+pub fn describe_show_create_cluster(
+    _: &StatementContext,
+    _: ShowCreateClusterStatement<Aug>,
 ) -> Result<StatementDesc, PlanError> {
     Ok(StatementDesc::new(Some(
         RelationDesc::empty()

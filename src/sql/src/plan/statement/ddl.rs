@@ -126,7 +126,7 @@ use crate::plan::statement::{scl, StatementContext, StatementDesc};
 use crate::plan::typeconv::{plan_cast, CastContext};
 use crate::plan::with_options::{OptionalDuration, TryFromValue};
 use crate::plan::{
-    plan_utils, query, transform_ast, AlterClusterPlan, AlterClusterRenamePlan,
+    literal, plan_utils, query, transform_ast, AlterClusterPlan, AlterClusterRenamePlan,
     AlterClusterReplicaRenamePlan, AlterClusterSwapPlan, AlterConnectionPlan, AlterItemRenamePlan,
     AlterNoopPlan, AlterOptionParameter, AlterRetainHistoryPlan, AlterRolePlan,
     AlterSchemaRenamePlan, AlterSchemaSwapPlan, AlterSecretPlan, AlterSetClusterPlan,
@@ -3698,6 +3698,76 @@ pub fn plan_create_cluster(
     }
 }
 
+pub fn unplan_create_cluster(
+    CreateClusterPlan { name, variant }: CreateClusterPlan,
+) -> CreateClusterStatement<Aug> {
+    match variant {
+        CreateClusterVariant::Managed(CreateClusterManagedPlan {
+            replication_factor,
+            size,
+            availability_zones,
+            compute,
+            disk,
+            optimizer_feature_overrides,
+            schedule,
+        }) => {
+            let schedule = unplan_cluster_schedule(schedule);
+            let OptimizerFeatureOverrides {
+                enable_consolidate_after_union_negate: _,
+                enable_reduce_mfp_fusion: _,
+                enable_cardinality_estimates: _,
+                persist_fast_path_limit: _,
+                reoptimize_imported_views,
+                enable_eager_delta_joins,
+                enable_new_outer_join_lowering,
+                enable_variadic_left_join_lowering,
+                enable_letrec_fixpoint_analysis,
+            } = optimizer_feature_overrides;
+            let features = ClusterFeatureExtracted {
+                // TODO(jkosh44) What's this?
+                seen: Default::default(),
+                reoptimize_imported_views,
+                enable_eager_delta_joins,
+                enable_new_outer_join_lowering,
+                enable_variadic_left_join_lowering,
+                enable_letrec_fixpoint_analysis,
+            };
+            // TODO(jkosh44) Actually set features.
+            let features = Vec::new();
+            // TODO(jkosh44) Check to see if any of the disk mishegoss is necessary here.
+            let availability_zones = if availability_zones.is_empty() {
+                None
+            } else {
+                Some(availability_zones)
+            };
+            let (introspection_interval, introspection_debugging) =
+                unplan_compute_replica_config(compute);
+            let cluster_options_extracted = ClusterOptionExtracted {
+                // TODO(jkosh44) What's this?
+                seen: Default::default(),
+                availability_zones,
+                disk: Some(disk),
+                introspection_debugging: Some(introspection_debugging),
+                introspection_interval,
+                managed: Some(true),
+                replicas: None,
+                replication_factor: Some(replication_factor),
+                size: Some(size),
+                schedule: Some(schedule),
+            };
+            // TODO(jkosh44) actually set the options.
+            let options = Vec::new();
+            let name = Ident::new_unchecked(name);
+            CreateClusterStatement {
+                name,
+                options,
+                features,
+            }
+        }
+        CreateClusterVariant::Unmanaged(_) => todo!(),
+    }
+}
+
 generate_extracted_config!(
     ReplicaOption,
     (AvailabilityZone, String),
@@ -3850,6 +3920,7 @@ fn plan_replica_config(
     }
 }
 
+/// TODO(jkosh44)
 fn plan_compute_replica_config(
     introspection_interval: Option<OptionalDuration>,
     introspection_debugging: bool,
@@ -3871,6 +3942,20 @@ fn plan_compute_replica_config(
     Ok(compute)
 }
 
+/// TODO(jkosh44)
+fn unplan_compute_replica_config(
+    compute_replica_config: ComputeReplicaConfig,
+) -> (Option<OptionalDuration>, bool) {
+    match compute_replica_config.introspection {
+        Some(ComputeReplicaIntrospectionConfig {
+            debugging,
+            interval,
+        }) => (Some(OptionalDuration(Some(interval))), debugging),
+        None => (Some(OptionalDuration(None)), false),
+    }
+}
+
+/// TODO(jkosh44)
 fn plan_cluster_schedule(
     schedule: ClusterScheduleOptionValue,
 ) -> Result<ClusterSchedule, PlanError> {
@@ -3910,6 +3995,24 @@ fn plan_cluster_schedule(
             }
         }
     })
+}
+
+/// TODO(jkosh44)
+fn unplan_cluster_schedule(schedule: ClusterSchedule) -> ClusterScheduleOptionValue {
+    match schedule {
+        ClusterSchedule::Manual => ClusterScheduleOptionValue::Manual,
+        ClusterSchedule::Refresh {
+            rehydration_time_estimate,
+        } => {
+            // TODO(jkosh44) Remove expect and add Result.
+            let interval = Interval::from_duration(&rehydration_time_estimate)
+                .expect("invalid duration stored");
+            let interval_value = literal::unplan_interval(&interval);
+            ClusterScheduleOptionValue::Refresh {
+                rehydration_time_estimate: Some(interval_value),
+            }
+        }
+    }
 }
 
 pub fn describe_create_cluster_replica(

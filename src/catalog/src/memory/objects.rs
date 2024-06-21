@@ -18,6 +18,7 @@ use std::ops::{Deref, DerefMut};
 use chrono::{DateTime, Utc};
 use mz_adapter_types::compaction::CompactionWindow;
 use mz_adapter_types::connection::ConnectionId;
+use mz_compute_client::controller::ComputeReplicaLogging;
 use mz_compute_client::logging::LogVariant;
 use mz_controller::clusters::{ClusterRole, ClusterStatus, ReplicaConfig, ReplicaLogging};
 use mz_controller_types::{ClusterId, ReplicaId};
@@ -41,8 +42,10 @@ use mz_sql::names::{
     ResolvedDatabaseSpecifier, ResolvedIds, SchemaId, SchemaSpecifier,
 };
 use mz_sql::plan::{
-    ClusterSchedule, CreateSourcePlan, HirRelationExpr, Ingestion as PlanIngestion,
-    WebhookBodyFormat, WebhookHeaders, WebhookValidation,
+    ClusterSchedule, ComputeReplicaConfig, ComputeReplicaIntrospectionConfig,
+    CreateClusterManagedPlan, CreateClusterPlan, CreateClusterUnmanagedPlan, CreateClusterVariant,
+    CreateSourcePlan, HirRelationExpr, Ingestion as PlanIngestion, WebhookBodyFormat,
+    WebhookHeaders, WebhookValidation,
 };
 use mz_sql::rbac;
 use mz_sql::session::vars::OwnedVarInput;
@@ -345,6 +348,53 @@ impl Cluster {
             ClusterVariant::Managed(managed) => Some(&managed.availability_zones),
             ClusterVariant::Unmanaged => None,
         }
+    }
+
+    // TODO(jkosh44) Better name since sequencing is not visible to this crate. That's a bit
+    // unfortunate, because we'd like to stick this right next to the sequencing method which should
+    // be the exact opposite.
+    fn unsequence(&self) -> CreateClusterPlan {
+        let name = self.name.clone();
+        let variant = match &self.config.variant {
+            ClusterVariant::Managed(ClusterVariantManaged {
+                size,
+                availability_zones,
+                logging,
+                replication_factor,
+                disk,
+                optimizer_feature_overrides,
+                schedule,
+            }) => {
+                let introspection = match logging {
+                    ReplicaLogging {
+                        log_logging,
+                        interval: Some(interval),
+                    } => Some(ComputeReplicaIntrospectionConfig {
+                        debugging: *log_logging,
+                        interval: interval.clone(),
+                    }),
+                    ReplicaLogging {
+                        log_logging: _,
+                        interval: None,
+                    } => None,
+                };
+                let compute = ComputeReplicaConfig { introspection };
+                CreateClusterVariant::Managed(CreateClusterManagedPlan {
+                    replication_factor: replication_factor.clone(),
+                    size: size.clone(),
+                    availability_zones: availability_zones.clone(),
+                    compute,
+                    disk: disk.clone(),
+                    optimizer_feature_overrides: optimizer_feature_overrides.clone(),
+                    schedule: schedule.clone(),
+                })
+            }
+            ClusterVariant::Unmanaged => {
+                // TODO(jkosh44)
+                CreateClusterVariant::Unmanaged(CreateClusterUnmanagedPlan { replicas: todo!() })
+            }
+        };
+        CreateClusterPlan { name, variant }
     }
 }
 
@@ -2212,6 +2262,11 @@ impl mz_sql::catalog::CatalogCluster<'_> for Cluster {
             ClusterVariant::Managed(ClusterVariantManaged { schedule, .. }) => Some(schedule),
             _ => None,
         }
+    }
+
+    // TODO(jkosh44) Better name.
+    fn unsequence(&self) -> CreateClusterPlan {
+        self.unsequence()
     }
 }
 
