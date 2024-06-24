@@ -120,7 +120,7 @@ pub struct BuiltinLog {
     pub access: Vec<MzAclItem>,
 }
 
-#[derive(Hash, Debug, PartialEq, Eq)]
+#[derive(Hash, Debug)]
 pub struct BuiltinTable {
     pub name: &'static str,
     pub schema: &'static str,
