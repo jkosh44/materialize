@@ -347,7 +347,7 @@ impl Catalog {
                 txn.set_catalog_content_version(config.build_info.version.to_string())?;
                 // Throw the existing item updates away because they may have been re-written in
                 // the migration.
-                let item_updates = txn.get_items().map(|item| StateUpdate{kind: StateUpdateKind::Item(item), ts: config.boot_ts, diff: StateDiff::Addition}).collect();
+                let item_updates = txn.get_items().map(|item| StateUpdate { kind: StateUpdateKind::Item(item), ts: config.boot_ts, diff: StateDiff::Addition }).collect();
                 let builtin_table_update = state.apply_updates_for_bootstrap(item_updates).await;
                 builtin_table_updates.extend(builtin_table_update);
             } else {
@@ -447,7 +447,7 @@ impl Catalog {
                             let res = task_state.parse_item(&create_sql, None, false, None);
                             (id, res)
                         }
-                        .instrument(span),
+                            .instrument(span),
                     );
                     handles.push(handle);
                 }
@@ -511,8 +511,8 @@ impl Catalog {
                 }
                 // If we were missing a dependency, wait for it to be added.
                 Err(AdapterError::PlanError(plan::PlanError::Catalog(
-                    SqlCatalogError::UnknownItem(missing_dep),
-                ))) => match GlobalId::from_str(&missing_dep) {
+                                                SqlCatalogError::UnknownItem(missing_dep),
+                                            ))) => match GlobalId::from_str(&missing_dep) {
                     Ok(missing_dep) => {
                         if completed_ids.contains(&missing_dep) {
                             ready.push_back(id);
@@ -698,8 +698,8 @@ impl Catalog {
                 last_seen_version,
             ))
         }
-        .instrument(tracing::info_span!("catalog::open"))
-        .boxed()
+            .instrument(tracing::info_span!("catalog::open"))
+            .boxed()
     }
 
     /// The objects in the catalog form one or more DAGs (directed acyclic graph) via object
@@ -1259,6 +1259,7 @@ fn default_logging_config() -> ReplicaLogging {
         interval: Some(Duration::from_secs(1)),
     }
 }
+
 pub struct BuiltinBootstrapClusterSizes {
     /// Size to default system_cluster on bootstrap
     pub system_cluster: String,
@@ -1470,7 +1471,7 @@ mod builtin_migration_tests {
         name_vec.into_iter().map(|name| id_lookup[&name]).collect()
     }
 
-    fn convert_ids_to_names<I: IntoIterator<Item = GlobalId>>(
+    fn convert_ids_to_names<I: IntoIterator<Item=GlobalId>>(
         ids: I,
         name_lookup: &BTreeMap<GlobalId, String>,
     ) -> BTreeSet<String> {
@@ -1516,13 +1517,13 @@ mod builtin_migration_tests {
                     migrated_ids,
                     id_fingerprint_map,
                 )
-                .expect("failed to generate builtin migration metadata")
+                    .expect("failed to generate builtin migration metadata")
             };
 
             assert_eq!(
                 convert_ids_to_names(
                     migration_metadata.previous_storage_collection_ids,
-                    &name_mapping
+                    &name_mapping,
                 ),
                 test_case
                     .expected_previous_storage_collection_names
@@ -1565,11 +1566,14 @@ mod builtin_migration_tests {
             );
             catalog.expire().await;
         })
-        .await
+            .await
     }
 
     #[mz_ore::test(tokio::test)]
-    #[cfg_attr(miri, ignore)] //  unsupported operation: can't call foreign function `TLS_client_method` on OS `linux`
+    #[cfg_attr(
+        miri,
+        ignore
+    )] //  unsupported operation: can't call foreign function `TLS_client_method` on OS `linux`
     async fn test_builtin_migration_no_migrations() {
         let test_case = BuiltinMigrationTestCase {
             test_name: "no_migrations",
@@ -1588,7 +1592,10 @@ mod builtin_migration_tests {
     }
 
     #[mz_ore::test(tokio::test)]
-    #[cfg_attr(miri, ignore)] //  unsupported operation: can't call foreign function `TLS_client_method` on OS `linux`
+    #[cfg_attr(
+        miri,
+        ignore
+    )] //  unsupported operation: can't call foreign function `TLS_client_method` on OS `linux`
     async fn test_builtin_migration_single_migrations() {
         let test_case = BuiltinMigrationTestCase {
             test_name: "single_migrations",
@@ -1607,7 +1614,10 @@ mod builtin_migration_tests {
     }
 
     #[mz_ore::test(tokio::test)]
-    #[cfg_attr(miri, ignore)] //  unsupported operation: can't call foreign function `TLS_client_method` on OS `linux`
+    #[cfg_attr(
+        miri,
+        ignore
+    )] //  unsupported operation: can't call foreign function `TLS_client_method` on OS `linux`
     async fn test_builtin_migration_child_migrations() {
         let test_case = BuiltinMigrationTestCase {
             test_name: "child_migrations",
@@ -1635,7 +1645,10 @@ mod builtin_migration_tests {
     }
 
     #[mz_ore::test(tokio::test)]
-    #[cfg_attr(miri, ignore)] //  unsupported operation: can't call foreign function `TLS_client_method` on OS `linux`
+    #[cfg_attr(
+        miri,
+        ignore
+    )] //  unsupported operation: can't call foreign function `TLS_client_method` on OS `linux`
     async fn test_builtin_migration_multi_child_migrations() {
         let test_case = BuiltinMigrationTestCase {
             test_name: "multi_child_migrations",
@@ -1674,7 +1687,10 @@ mod builtin_migration_tests {
     }
 
     #[mz_ore::test(tokio::test)]
-    #[cfg_attr(miri, ignore)] //  unsupported operation: can't call foreign function `TLS_client_method` on OS `linux`
+    #[cfg_attr(
+        miri,
+        ignore
+    )] //  unsupported operation: can't call foreign function `TLS_client_method` on OS `linux`
     async fn test_builtin_migration_topological_sort() {
         let test_case = BuiltinMigrationTestCase {
             test_name: "topological_sort",
@@ -1719,7 +1735,10 @@ mod builtin_migration_tests {
     }
 
     #[mz_ore::test(tokio::test)]
-    #[cfg_attr(miri, ignore)] //  unsupported operation: can't call foreign function `TLS_client_method` on OS `linux`
+    #[cfg_attr(
+        miri,
+        ignore
+    )] //  unsupported operation: can't call foreign function `TLS_client_method` on OS `linux`
     async fn test_builtin_migration_topological_sort_complex() {
         let test_case = BuiltinMigrationTestCase {
             test_name: "topological_sort_complex",
@@ -1904,7 +1923,10 @@ mod builtin_migration_tests {
     }
 
     #[mz_ore::test(tokio::test)]
-    #[cfg_attr(miri, ignore)] //  unsupported operation: can't call foreign function `TLS_client_method` on OS `linux`
+    #[cfg_attr(
+        miri,
+        ignore
+    )] //  unsupported operation: can't call foreign function `TLS_client_method` on OS `linux`
     async fn test_builtin_migration_system_child_migrations() {
         let test_case = BuiltinMigrationTestCase {
             test_name: "system_child_migrations",
