@@ -9,12 +9,6 @@
 
 //! A cache of the txn shard contents.
 
-use std::cmp::{max, min};
-use std::collections::{BTreeMap, VecDeque};
-use std::fmt::Debug;
-use std::ops::{Deref, DerefMut};
-use std::sync::Arc;
-
 use differential_dataflow::hashable::Hashable;
 use differential_dataflow::lattice::Lattice;
 use itertools::Itertools;
@@ -29,9 +23,15 @@ use mz_persist_client::write::WriteHandle;
 use mz_persist_client::{Diagnostics, PersistClient, ShardId};
 use mz_persist_types::txn::{TxnsCodec, TxnsEntry};
 use mz_persist_types::{Codec64, StepForward};
+use std::cmp::{max, min};
+use std::collections::{BTreeMap, VecDeque};
+use std::fmt::Debug;
+use std::ops::{Deref, DerefMut};
+use std::sync::Arc;
+use std::time::Instant;
 use timely::order::TotalOrder;
 use timely::progress::{Antichain, Timestamp};
-use tracing::debug;
+use tracing::{debug, info};
 
 use crate::metrics::Metrics;
 use crate::txn_read::{DataListenNext, DataRemapEntry, DataSnapshot, DataSubscribe};
@@ -798,9 +798,24 @@ where
         txns_read: ReadHandle<C::Key, C::Val, T, i64>,
         txns_write: &mut WriteHandle<C::Key, C::Val, T, i64>,
     ) -> Self {
+        let start = Instant::now();
         let () = crate::empty_caa(|| "txns init", txns_write, init_ts.clone()).await;
+        info!(
+            "TXNS HANDLE INIT LOOK HERE: empty caa took {:?}",
+            start.elapsed()
+        );
+        let start = Instant::now();
         let mut ret = Self::from_read(txns_read, None).await;
+        info!(
+            "TXNS HANDLE INIT LOOK HERE: from read took {:?}",
+            start.elapsed()
+        );
+        let start = Instant::now();
         let _ = ret.update_gt(&init_ts).await;
+        info!(
+            "TXNS HANDLE INIT LOOK HERE: update gt took {:?}",
+            start.elapsed()
+        );
         ret
     }
 

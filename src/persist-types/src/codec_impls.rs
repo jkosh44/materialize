@@ -402,7 +402,8 @@ impl Codec for Bytes {
     type Schema = VecU8Schema;
 
     fn codec_name() -> String {
-        "Bytes".into()
+        // TODO(jkosh44)
+        "Vec<u8>".into()
     }
 
     fn encode<B>(&self, buf: &mut B)

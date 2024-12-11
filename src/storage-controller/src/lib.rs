@@ -2544,17 +2544,28 @@ where
         txn: &dyn StorageTxn<T>,
         storage_collections: Arc<dyn StorageCollections<Timestamp = T> + Send + Sync>,
     ) -> Self {
+        let start = Instant::now();
         let txns_client = persist_clients
             .open(persist_location.clone())
             .await
             .expect("location should be valid");
+        info!(
+            "CONTROLLER NEW LOOK HERE: open txns client took {:?}",
+            start.elapsed()
+        );
 
+        let start = Instant::now();
         let persist_warm_task = warm_persist_state_in_background(
             txns_client.clone(),
             txn.get_collection_metadata().into_values(),
         );
         let persist_warm_task = Some(persist_warm_task.abort_on_drop());
+        info!(
+            "CONTROLLER NEW LOOK HERE: create warm task took {:?}",
+            start.elapsed()
+        );
 
+        let start = Instant::now();
         let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
 
         // This value must be already installed because we must ensure it's
@@ -2589,8 +2600,19 @@ where
             .await;
             persist_handles::PersistTableWriteWorker::new_txns(txns)
         };
-        let txns_read = TxnsRead::start::<TxnsCodecRow>(txns_client.clone(), txns_id).await;
+        info!(
+            "CONTROLLER NEW LOOK HERE: create persist table worker took {:?}",
+            start.elapsed()
+        );
 
+        let start = Instant::now();
+        let txns_read = TxnsRead::start::<TxnsCodecRow>(txns_client.clone(), txns_id).await;
+        info!(
+            "CONTROLLER NEW LOOK HERE: create txns read took {:?}",
+            start.elapsed()
+        );
+
+        let start = Instant::now();
         let collection_manager = collection_mgmt::CollectionManager::new(read_only, now.clone());
 
         let introspection_ids = BTreeMap::new();
@@ -2609,7 +2631,7 @@ where
 
         let metrics = StorageControllerMetrics::new(metrics_registry, controller_metrics);
 
-        Self {
+        let res = Self {
             build_info,
             collections: BTreeMap::default(),
             exports: BTreeMap::default(),
@@ -2651,7 +2673,14 @@ where
             instance_response_rx,
             instance_response_tx,
             persist_warm_task,
-        }
+        };
+
+        info!(
+            "CONTROLLER NEW LOOK HERE: postamble took {:?}",
+            start.elapsed()
+        );
+
+        res
     }
 
     // This is different from `set_read_policies`, which is for external users.

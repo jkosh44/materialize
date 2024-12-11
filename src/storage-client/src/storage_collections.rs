@@ -433,6 +433,7 @@ where
         connection_context: ConnectionContext,
         txn: &dyn StorageTxn<T>,
     ) -> Self {
+        let start = Instant::now();
         let metrics = StorageCollectionsMetrics::register_into(metrics_registry);
 
         // This value must be already installed because we must ensure it's
@@ -441,12 +442,22 @@ where
         let txns_id = txn
             .get_txn_wal_shard()
             .expect("must call prepare initialization before creating StorageCollections");
+        info!(
+            "STORAGE COLLECTIONS IMPL NEW LOOK HERE: preamble took {:?}",
+            start.elapsed()
+        );
 
+        let start = Instant::now();
         let txns_client = persist_clients
             .open(persist_location.clone())
             .await
             .expect("location should be valid");
+        info!(
+            "STORAGE COLLECTIONS IMPL NEW LOOK HERE: open txns client took {:?}",
+            start.elapsed()
+        );
 
+        let start = Instant::now();
         // We have to initialize, so that TxnsRead::start() below does not
         // block.
         let _txns_handle: TxnsHandle<SourceData, (), T, i64, PersistEpoch, TxnsCodecRow> =
@@ -458,7 +469,12 @@ where
                 txns_id,
             )
             .await;
+        info!(
+            "STORAGE COLLECTIONS IMPL NEW LOOK HERE: open txns handle took {:?}",
+            start.elapsed()
+        );
 
+        let start = Instant::now();
         // For handing to the background task, for listening to upper updates.
         let (txns_key_schema, txns_val_schema) = TxnsCodecRow::schemas();
         let mut txns_write = txns_client
@@ -473,9 +489,19 @@ where
             )
             .await
             .expect("txns schema shouldn't change");
+        info!(
+            "STORAGE COLLECTIONS IMPL NEW LOOK HERE: open writer took {:?}",
+            start.elapsed()
+        );
 
+        let start = Instant::now();
         let txns_read = TxnsRead::start::<TxnsCodecRow>(txns_client.clone(), txns_id).await;
+        info!(
+            "STORAGE COLLECTIONS IMPL NEW LOOK HERE: start reader took {:?}",
+            start.elapsed()
+        );
 
+        let start = Instant::now();
         let collections = Arc::new(std::sync::Mutex::new(BTreeMap::default()));
         let finalizable_shards =
             Arc::new(ShardIdSet::new(metrics.finalization_outstanding.clone()));
@@ -522,7 +548,7 @@ where
             }),
         );
 
-        Self {
+        let res = Self {
             finalizable_shards,
             finalized_shards,
             collections,
@@ -537,7 +563,14 @@ where
             holds_tx,
             _background_task: Arc::new(background_task.abort_on_drop()),
             _finalize_shards_task: Arc::new(finalize_shards_task.abort_on_drop()),
-        }
+        };
+
+        info!(
+            "STORAGE COLLECTIONS IMPL NEW LOOK HERE: postamble took {:?}",
+            start.elapsed()
+        );
+
+        res
     }
 
     /// Opens a [WriteHandle] and a [SinceHandleWrapper], for holding back the since.

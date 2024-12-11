@@ -9,11 +9,6 @@
 
 //! An interface for atomic multi-shard writes.
 
-use std::collections::BTreeMap;
-use std::fmt::Debug;
-use std::ops::{Deref, DerefMut};
-use std::sync::Arc;
-
 use differential_dataflow::difference::Semigroup;
 use differential_dataflow::lattice::Lattice;
 use futures::stream::FuturesUnordered;
@@ -29,9 +24,14 @@ use mz_persist_client::{Diagnostics, PersistClient, ShardId};
 use mz_persist_types::schema::SchemaId;
 use mz_persist_types::txn::{TxnsCodec, TxnsEntry};
 use mz_persist_types::{Codec, Codec64, Opaque, StepForward};
+use std::collections::BTreeMap;
+use std::fmt::Debug;
+use std::ops::{Deref, DerefMut};
+use std::sync::Arc;
+use std::time::Instant;
 use timely::order::TotalOrder;
 use timely::progress::Timestamp;
-use tracing::debug;
+use tracing::{debug, info};
 
 use crate::metrics::Metrics;
 use crate::txn_cache::{TxnsCache, Unapplied};
@@ -137,7 +137,13 @@ where
         metrics: Arc<Metrics>,
         txns_id: ShardId,
     ) -> Self {
+        let start = Instant::now();
         let (txns_key_schema, txns_val_schema) = C::schemas();
+        info!(
+            "TXNS HANDLE OPEN LOOK HERE: preamble took {:?}",
+            start.elapsed()
+        );
+        let start = Instant::now();
         let (mut txns_write, txns_read) = client
             .open(
                 txns_id,
@@ -151,6 +157,11 @@ where
             )
             .await
             .expect("txns schema shouldn't change");
+        info!(
+            "TXNS HANDLE OPEN LOOK HERE: open handles took {:?}",
+            start.elapsed()
+        );
+        let start = Instant::now();
         let txns_since = client
             .open_critical_since(
                 txns_id,
@@ -164,7 +175,16 @@ where
             )
             .await
             .expect("txns schema shouldn't change");
+        info!(
+            "TXNS HANDLE OPEN LOOK HERE: open critical since took {:?}",
+            start.elapsed()
+        );
+        let start = Instant::now();
         let txns_cache = TxnsCache::init(init_ts, txns_read, &mut txns_write).await;
+        info!(
+            "TXNS HANDLE OPEN LOOK HERE: txns cache init took {:?}",
+            start.elapsed()
+        );
         TxnsHandle {
             metrics,
             txns_cache,
